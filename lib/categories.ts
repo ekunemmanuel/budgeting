@@ -1,0 +1,30 @@
+import { Category } from './types';
+
+export const INCOME_CATEGORY_ID = 'income';
+
+export const CATEGORIES: Category[] = [
+  { id: INCOME_CATEGORY_ID, label: 'Income', icon: 'cash-outline', color: '#16a37a' },
+  { id: 'food', label: 'Food & Drink', icon: 'fast-food-outline', color: '#e0923d' },
+  { id: 'groceries', label: 'Groceries', icon: 'basket-outline', color: '#4d9de0' },
+  { id: 'transport', label: 'Transport', icon: 'car-outline', color: '#7b6ee0' },
+  { id: 'housing', label: 'Housing', icon: 'home-outline', color: '#c4577c' },
+  { id: 'bills', label: 'Bills & Utilities', icon: 'receipt-outline', color: '#5a6b7d' },
+  { id: 'entertainment', label: 'Entertainment', icon: 'film-outline', color: '#a04de0' },
+  { id: 'shopping', label: 'Shopping', icon: 'bag-handle-outline', color: '#e04d84' },
+  { id: 'health', label: 'Health', icon: 'medkit-outline', color: '#3dbf9c' },
+  { id: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline', color: '#8a8a94' },
+];
+
+export const EXPENSE_CATEGORIES = CATEGORIES.filter((c) => c.id !== INCOME_CATEGORY_ID);
+
+const CUSTOM_CATEGORY_COLORS = ['#e0923d', '#4d9de0', '#7b6ee0', '#c4577c', '#5a6b7d', '#a04de0', '#e04d84', '#3dbf9c'];
+
+export function nextCustomCategoryColor(existingCount: number): string {
+  return CUSTOM_CATEGORY_COLORS[existingCount % CUSTOM_CATEGORY_COLORS.length];
+}
+
+export function getCategory(id: string, extra: Category[] = []): Category {
+  return (
+    CATEGORIES.find((c) => c.id === id) ?? extra.find((c) => c.id === id) ?? CATEGORIES[CATEGORIES.length - 1]
+  );
+}
