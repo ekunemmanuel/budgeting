@@ -8,7 +8,7 @@ export function ModalHeader({ title }: { title: string }) {
   const colors = useThemeColors();
 
   return (
-    <View className="flex-row items-center justify-between border-b border-border bg-bg px-5 pb-3 pt-safe-or-4">
+    <View className="flex-row items-center justify-between border-b border-border bg-bg px-safe-or-5 pb-3 pt-safe-or-4">
       <Pressable
         onPress={() => router.back()}
         hitSlop={8}

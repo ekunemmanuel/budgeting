@@ -2,27 +2,34 @@ import { useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useData } from '../lib/store';
-import { EXPENSE_CATEGORIES, INCOME_CATEGORY_ID } from '../lib/categories';
+import { INCOME_CATEGORY_ID } from '../lib/categories';
+import { parseAmountInput } from '../lib/format';
 import { TransactionType } from '../lib/types';
 import { useKeyboardAwareScroll } from '../lib/use-keyboard-aware-scroll';
 import { ModalHeader } from '../components/modal-header';
 import { Text } from '../components/text';
 
 export default function AddTransaction() {
-  const { addTransaction, customCategories } = useData();
-  const allExpenseCategories = [...EXPENSE_CATEGORIES, ...customCategories];
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { transactions, addTransaction, updateTransaction, expenseCategories } = useData();
 
-  const [type, setType] = useState<TransactionType>('expense');
-  const [amount, setAmount] = useState('');
-  const [categoryId, setCategoryId] = useState(allExpenseCategories[0].id);
-  const [note, setNote] = useState('');
-  const [date, setDate] = useState(new Date());
+  const editing = transactions.find((t) => t.id === id);
+
+  const [type, setType] = useState<TransactionType>(editing?.type ?? 'expense');
+  const [amount, setAmount] = useState(editing ? String(editing.amount) : '');
+  const [categoryId, setCategoryId] = useState(
+    editing && editing.type === 'expense' ? editing.categoryId : expenseCategories[0].id
+  );
+  const [source, setSource] = useState(editing?.source ?? '');
+  const [note, setNote] = useState(editing?.note ?? '');
+  const [date, setDate] = useState(editing ? new Date(editing.date) : new Date());
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
 
   const amountRef = useRef<TextInput>(null);
+  const sourceRef = useRef<TextInput>(null);
   const noteRef = useRef<TextInput>(null);
   const { scrollRef, keyboardPadding, onFocusInput, onBlurInput, onContentSizeChangeInput, onScroll } =
     useKeyboardAwareScroll();
@@ -32,25 +39,31 @@ export default function AddTransaction() {
 
   const save = () => {
     if (!canSave) return;
-    addTransaction({
+
+    const payload = {
       type,
       amount: parsedAmount,
       categoryId: type === 'income' ? INCOME_CATEGORY_ID : categoryId,
       note: note.trim(),
       date: date.toISOString(),
-    });
+      source: type === 'income' ? source.trim() : undefined,
+    };
+
+    if (editing) updateTransaction(editing.id, payload);
+    else addTransaction(payload);
+
     if (Platform.OS === 'ios') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.back();
   };
 
   return (
     <View className="flex-1 bg-bg">
-      <ModalHeader title="Add Transaction" />
+      <ModalHeader title={editing ? 'Edit Transaction' : 'Add Transaction'} />
       <ScrollView
         ref={scrollRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        contentContainerClassName="px-5 pt-4"
+        contentContainerClassName="px-safe-or-5 pt-4"
         contentContainerStyle={{ paddingBottom: 64 + keyboardPadding }}
         keyboardShouldPersistTaps="handled"
       >
@@ -72,8 +85,8 @@ export default function AddTransaction() {
           <Text className="text-sm text-muted">Amount</Text>
           <TextInput
             ref={amountRef}
-            value={amount ? `₦${amount}` : ''}
-            onChangeText={(text) => setAmount(text.replace(/[^0-9.]/g, ''))}
+            value={amount ? `₦${parseAmountInput(amount).display}` : ''}
+            onChangeText={(text) => setAmount(parseAmountInput(text).raw)}
             onFocus={() => onFocusInput(amountRef)}
             onBlur={() => onBlurInput(amountRef)}
             placeholder="₦0.00"
@@ -84,7 +97,24 @@ export default function AddTransaction() {
           />
         </View>
 
-        {type === 'expense' && (
+        {type === 'income' ? (
+          <View className="mt-6">
+            <View className="mb-2 flex-row items-baseline justify-between">
+              <Text className="text-sm font-medium text-ink">Source</Text>
+              <Text className="text-xs text-muted">Optional</Text>
+            </View>
+            <TextInput
+              ref={sourceRef}
+              value={source}
+              onChangeText={setSource}
+              onFocus={() => onFocusInput(sourceRef)}
+              onBlur={() => onBlurInput(sourceRef)}
+              placeholder="e.g. Salary, Freelance, Gift"
+              placeholderTextColorClassName="accent-muted"
+              className="rounded-2xl bg-surface border border-border p-3.5 font-sans text-sm text-ink"
+            />
+          </View>
+        ) : (
           <View className="mt-6">
             <View className="mb-2 flex-row items-center justify-between">
               <Text className="text-sm font-medium text-ink">Category</Text>
@@ -93,7 +123,7 @@ export default function AddTransaction() {
               </Pressable>
             </View>
             <View className="flex-row flex-wrap gap-2">
-              {allExpenseCategories.map((cat) => {
+              {expenseCategories.map((cat) => {
                 const selected = categoryId === cat.id;
                 return (
                   <Pressable
@@ -174,7 +204,9 @@ export default function AddTransaction() {
           disabled={!canSave}
           className={`mt-8 items-center rounded-2xl py-4 ${canSave ? 'bg-primary' : 'bg-primary/30'}`}
         >
-          <Text className="text-base font-semibold text-white">Save transaction</Text>
+          <Text className="text-base font-semibold text-white">
+            {editing ? 'Save changes' : 'Save transaction'}
+          </Text>
         </Pressable>
       </ScrollView>
     </View>

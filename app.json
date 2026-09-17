@@ -2,9 +2,9 @@
   "expo": {
     "name": "Budgeting",
     "slug": "budgeting",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "scheme": "budgeting",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -37,6 +37,15 @@
           "dark": {
             "image": "./assets/splash-icon.png",
             "backgroundColor": "#0e0f10"
+          }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
           }
         }
       ]

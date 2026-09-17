@@ -1,23 +1,42 @@
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useThemeColors } from '../../lib/theme';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { FloatingTabBar } from '../../components/floating-tab-bar';
 
 export default function TabsLayout() {
-  const colors = useThemeColors();
-
   return (
-    <NativeTabs tintColor={colors.primary}>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} md="home" />
-        <NativeTabs.Trigger.Label>Overview</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="transactions">
-        <NativeTabs.Trigger.Icon sf="list.bullet" md="receipt_long" />
-        <NativeTabs.Trigger.Label>Transactions</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="budgets">
-        <NativeTabs.Trigger.Icon sf="chart.pie.fill" md="pie_chart" />
-        <NativeTabs.Trigger.Label>Budgets</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    // A floating island can't be the platform's own tab bar, so this is the JS
+    // tabs navigator with the chrome replaced entirely.
+    <Tabs
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <FloatingTabBar {...props} />}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Overview',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="transactions"
+        options={{
+          title: 'Transactions',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons name={focused ? 'list' : 'list-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="budgets"
+        options={{
+          title: 'Budgets',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons name={focused ? 'pie-chart' : 'pie-chart-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }

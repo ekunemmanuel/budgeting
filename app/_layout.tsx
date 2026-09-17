@@ -8,6 +8,9 @@ import { SafeAreaListener, SafeAreaProvider } from 'react-native-safe-area-conte
 import { StatusBar } from 'expo-status-bar';
 import { Uniwind } from 'uniwind';
 import { DataProvider } from '../lib/store';
+import { TourProvider } from '../lib/tour';
+import { TourOverlay } from '../components/tour-overlay';
+import { UpdateBanner } from '../components/update-banner';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -48,13 +51,37 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <SafeAreaListener onChange={({ insets }) => Uniwind.updateInsets(insets)}>
         <DataProvider>
-          <StatusBar style="auto" />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="add-transaction" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="edit-budget" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="add-category" options={{ presentation: 'modal' }} />
-          </Stack>
+          {/* The overlay is a sibling of the navigator so its spotlight can
+              cover the floating tab bar, not just the screen inside it. */}
+          <TourProvider>
+            <StatusBar style="auto" />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="add-transaction" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="edit-budget" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="add-category" options={{ presentation: 'modal' }} />
+              <Stack.Screen
+                name="amount-detail"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: 'fitToContents',
+                  sheetGrabberVisible: true,
+                  sheetCornerRadius: 24,
+                }}
+              />
+              <Stack.Screen
+                name="confirm-delete"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: 'fitToContents',
+                  sheetGrabberVisible: true,
+                  sheetCornerRadius: 24,
+                }}
+              />
+            </Stack>
+            <UpdateBanner />
+            <TourOverlay />
+          </TourProvider>
         </DataProvider>
       </SafeAreaListener>
     </SafeAreaProvider>

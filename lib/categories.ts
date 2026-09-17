@@ -1,6 +1,14 @@
 import { Category } from './types';
 
 export const INCOME_CATEGORY_ID = 'income';
+export const OTHER_CATEGORY_ID = 'other';
+
+/**
+ * Categories that can never be removed or hidden: income is the only home for
+ * incoming money, and Other is where transactions are re-filed when their
+ * category goes away.
+ */
+export const PROTECTED_CATEGORY_IDS = [INCOME_CATEGORY_ID, OTHER_CATEGORY_ID];
 
 export const CATEGORIES: Category[] = [
   { id: INCOME_CATEGORY_ID, label: 'Income', icon: 'cash-outline', color: '#16a37a' },
@@ -27,4 +35,12 @@ export function getCategory(id: string, extra: Category[] = []): Category {
   return (
     CATEGORIES.find((c) => c.id === id) ?? extra.find((c) => c.id === id) ?? CATEGORIES[CATEGORIES.length - 1]
   );
+}
+
+export function isBuiltInCategory(id: string): boolean {
+  return CATEGORIES.some((c) => c.id === id);
+}
+
+export function canRemoveCategory(id: string): boolean {
+  return !PROTECTED_CATEGORY_IDS.includes(id);
 }

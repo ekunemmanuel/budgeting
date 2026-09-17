@@ -14,6 +14,11 @@ export interface Transaction {
   categoryId: string;
   note: string;
   date: string;
+  /**
+   * Where an income came from — salary, a client, a gift. Optional, and only
+   * meaningful on income, which has no category of its own to describe it.
+   */
+  source?: string;
 }
 
 export type Budgets = Record<string, number>;

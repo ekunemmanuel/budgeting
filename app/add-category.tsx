@@ -28,7 +28,7 @@ export default function AddCategory() {
         ref={scrollRef}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        contentContainerClassName="px-5 pt-6"
+        contentContainerClassName="px-safe-or-5 pt-6"
         contentContainerStyle={{ paddingBottom: 32 + keyboardPadding }}
         keyboardShouldPersistTaps="handled"
       >
