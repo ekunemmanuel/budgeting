@@ -27,6 +27,28 @@ export const EXPENSE_CATEGORIES = CATEGORIES.filter((c) => c.id !== INCOME_CATEG
 
 const CUSTOM_CATEGORY_COLORS = ['#e0923d', '#4d9de0', '#7b6ee0', '#c4577c', '#5a6b7d', '#a04de0', '#e04d84', '#3dbf9c'];
 
+/** Icons offered when naming a category of your own. Ionicons outline names. */
+export const CATEGORY_ICONS = [
+  'pricetag-outline',
+  'fast-food-outline',
+  'basket-outline',
+  'car-outline',
+  'home-outline',
+  'receipt-outline',
+  'film-outline',
+  'bag-handle-outline',
+  'medkit-outline',
+  'school-outline',
+  'airplane-outline',
+  'barbell-outline',
+  'paw-outline',
+  'gift-outline',
+  'phone-portrait-outline',
+  'shirt-outline',
+  'construct-outline',
+  'wallet-outline',
+];
+
 export function nextCustomCategoryColor(existingCount: number): string {
   return CUSTOM_CATEGORY_COLORS[existingCount % CUSTOM_CATEGORY_COLORS.length];
 }

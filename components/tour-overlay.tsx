@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTour } from '../lib/tour';
+import { placeTourCard } from '../lib/tour-placement';
 import { useThemeColors } from '../lib/theme';
 import { Text } from './text';
 
@@ -10,8 +11,10 @@ const DIM = 'rgba(0, 0, 0, 0.72)';
 const PAD = 6;
 const CARD_GAP = 14;
 const CARD_SIDE = 20;
-/** Enough for the title, body and controls; the card is placed against this. */
-const CARD_ESTIMATE = 190;
+/** Keeps the card off the very edge of the screen on short devices. */
+const EDGE = 8;
+/** Below this the card is not worth showing, so it is allowed to overlap. */
+const MIN_CARD = 150;
 
 export function TourOverlay() {
   const { activeSteps, stepIndex, next, back, finish, rects } = useTour();
@@ -19,18 +22,45 @@ export function TourOverlay() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
+  const rootRef = useRef<View>(null);
+  // Targets report window coordinates, but this overlay is positioned inside
+  // the app's view tree. On Android those two spaces can differ by the height
+  // of the status bar, which varies by device, so a spotlight aligned on one
+  // phone lands off-target on another. Measuring where this overlay actually
+  // sits and subtracting it makes the two spaces agree everywhere; when they
+  // already agree the offset is simply zero.
+  const [origin, setOrigin] = useState({ x: 0, y: 0 });
+  const readOrigin = useCallback(() => {
+    rootRef.current?.measureInWindow((x, y) => {
+      setOrigin((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
+    });
+  }, []);
+
+  // Measured rather than estimated: a long body, or a device with large system
+  // text, makes this card much taller than any fixed guess.
+  const [cardHeight, setCardHeight] = useState(0);
+
   const step = activeSteps[stepIndex];
   const measured = step ? rects[step.target] : undefined;
+
+  const target = measured
+    ? {
+        x: measured.x - origin.x,
+        y: measured.y - origin.y,
+        width: measured.width,
+        height: measured.height,
+      }
+    : undefined;
 
   // A target that sits below the fold measures fine but is nowhere to be seen,
   // which would dim the screen around nothing. Treat off-screen as unusable.
   const rect =
-    measured &&
-    measured.y + measured.height > 0 &&
-    measured.y < height &&
-    measured.x + measured.width > 0 &&
-    measured.x < width
-      ? measured
+    target &&
+    target.y + target.height > 0 &&
+    target.y < height &&
+    target.x + target.width > 0 &&
+    target.x < width
+      ? target
       : undefined;
 
   // A target can also be legitimately absent: the list is empty, or the row it
@@ -44,25 +74,39 @@ export function TourOverlay() {
 
   if (!step || !rect) return null;
 
+  // Clamped to the screen so a partly visible target never produces a panel
+  // with a negative size.
+  const holeLeft = Math.max(0, Math.min(rect.x - PAD, width));
+  const holeTop = Math.max(0, Math.min(rect.y - PAD, height));
+  const holeRight = Math.min(width, Math.max(rect.x + rect.width + PAD, 0));
+  const holeBottom = Math.min(height, Math.max(rect.y + rect.height + PAD, 0));
   const hole = {
-    x: Math.max(0, rect.x - PAD),
-    y: Math.max(0, rect.y - PAD),
-    width: rect.width + PAD * 2,
-    height: rect.height + PAD * 2,
+    x: holeLeft,
+    y: holeTop,
+    width: Math.max(0, holeRight - holeLeft),
+    height: Math.max(0, holeBottom - holeTop),
   };
 
-  // Put the card under the highlight when there is room, otherwise above it.
-  const below = hole.y + hole.height + CARD_GAP;
-  const fitsBelow = below + CARD_ESTIMATE < height - insets.bottom;
-  const cardStyle = fitsBelow
-    ? { top: below }
-    : { bottom: height - hole.y + CARD_GAP };
+  const { top: cardTop, maxHeight: cardMaxHeight } = placeTourCard({
+    hole,
+    screenHeight: height,
+    insetTop: insets.top,
+    insetBottom: insets.bottom,
+    cardHeight,
+    gap: CARD_GAP,
+    edge: EDGE,
+    minCard: MIN_CARD,
+  });
 
   const first = stepIndex === 0;
   const last = stepIndex === activeSteps.length - 1;
 
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+    <View
+      ref={rootRef}
+      onLayout={readOrigin}
+      style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}
+    >
       {/* One transparent catcher across the whole screen, underneath the dim.
           It covers the spotlight hole too, so the screen behind cannot be
           tapped or scrolled while the tour is explaining it. Tapping anywhere
@@ -80,7 +124,7 @@ export function TourOverlay() {
             left: 0,
             top: hole.y + hole.height,
             right: 0,
-            height: height - (hole.y + hole.height),
+            height: Math.max(0, height - (hole.y + hole.height)),
             backgroundColor: DIM,
           }}
         />
@@ -92,7 +136,7 @@ export function TourOverlay() {
             position: 'absolute',
             left: hole.x + hole.width,
             top: hole.y,
-            width: width - (hole.x + hole.width),
+            width: Math.max(0, width - (hole.x + hole.width)),
             height: hole.height,
             backgroundColor: DIM,
           }}
@@ -114,19 +158,31 @@ export function TourOverlay() {
       </View>
 
       <View
+        onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}
         style={{
           position: 'absolute',
           left: CARD_SIDE,
           right: CARD_SIDE,
-          ...cardStyle,
+          top: cardTop,
+          maxHeight: cardMaxHeight,
         }}
       >
-        <View className="rounded-2xl bg-surface border border-border p-4">
+        <View className="rounded-2xl bg-surface border border-border p-4" style={{ flexShrink: 1 }}>
           <Text className="text-base font-semibold text-ink">{step.title}</Text>
-          <Text className="mt-1.5 text-sm text-muted">{step.body}</Text>
 
-          <View className="mt-4 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1.5">
+          {/* Only the body gives way when space is tight, so the title and the
+              controls are never the part that gets cut off. */}
+          <ScrollView
+            style={{ flexShrink: 1 }}
+            contentContainerStyle={{ paddingTop: 6 }}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <Text className="text-sm text-muted">{step.body}</Text>
+          </ScrollView>
+
+          <View className="mt-4 flex-row items-center justify-between gap-3">
+            <View className="flex-1 flex-row flex-wrap items-center gap-1.5">
               {activeSteps.map((s, i) => (
                 <View
                   key={s.target}
@@ -140,7 +196,7 @@ export function TourOverlay() {
               ))}
             </View>
 
-            <View className="flex-row items-center gap-2">
+            <View className="shrink-0 flex-row items-center gap-2">
               {!first && (
                 <Pressable onPress={back} hitSlop={8} className="px-3 py-2 active:opacity-70">
                   <Text className="text-sm font-medium text-muted">Back</Text>

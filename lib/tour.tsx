@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { loadToursSeen, saveToursSeen } from './storage';
 
@@ -24,6 +24,8 @@ interface TourContextValue {
 
   /** True while a tour is running, so screens can show sample content. */
   isActive: boolean;
+  /** Target id of the step being shown, so it can re-measure itself. */
+  activeTarget: string | undefined;
   activeSteps: TourStep[];
   stepIndex: number;
   next: () => void;
@@ -138,6 +140,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       measure,
       unmeasure,
       isActive: activeId !== null,
+      activeTarget: activeSteps[stepIndex]?.target,
       activeSteps,
       stepIndex,
       next,
@@ -157,6 +160,34 @@ export function useTour(): TourContextValue {
   const ctx = useContext(TourContext);
   if (!ctx) throw new Error('useTour must be used within a TourProvider');
   return ctx;
+}
+
+/**
+ * Decides whether a field may take focus on open, and focuses it once a tour
+ * has finished.
+ *
+ * A field that focuses itself raises the keyboard, which moves everything the
+ * tour is pointing at after the spotlight has been measured. Holding focus back
+ * until the tour is done keeps the page still underneath it, and the keyboard
+ * still appears immediately for everyone who has already seen the tour.
+ *
+ * Returns the value to pass to `autoFocus`.
+ */
+export function useFocusAfterTour(
+  tourId: string,
+  ref: React.RefObject<{ focus: () => void } | null>,
+  enabled = true
+): boolean {
+  const { isActive, hasSeen } = useTour();
+  const held = enabled && (isActive || !hasSeen(tourId));
+
+  const wasHeld = useRef(held);
+  useEffect(() => {
+    if (wasHeld.current && !held) ref.current?.focus();
+    wasHeld.current = held;
+  }, [held, ref]);
+
+  return !held;
 }
 
 /**

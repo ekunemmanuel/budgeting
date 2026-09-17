@@ -44,8 +44,10 @@ interface DataContextValue {
   deleteTransaction: (id: string) => void;
   setBudget: (categoryId: string, limit: number) => void;
   removeBudget: (categoryId: string) => void;
-  addCategory: (label: string) => Category;
+  addCategory: (label: string, icon?: string) => Category;
   renameCategory: (id: string, label: string) => void;
+  /** Changes a custom category's icon. Built-in categories keep theirs. */
+  setCategoryIcon: (id: string, icon: string) => void;
   /** Deletes a custom category, or hides a built-in one. Protected ids are ignored. */
   removeCategory: (id: string) => void;
   restoreCategory: (id: string) => void;
@@ -113,11 +115,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           return next;
         });
       },
-      addCategory: (label) => {
+      addCategory: (label, icon) => {
         const category: Category = {
           id: generateId(),
           label,
-          icon: 'pricetag-outline',
+          icon: icon ?? 'pricetag-outline',
           color: nextCustomCategoryColor(customCategories.length),
         };
         setCustomCategories((prev) => {
@@ -126,6 +128,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           return next;
         });
         return category;
+      },
+      setCategoryIcon: (id, icon) => {
+        setCustomCategories((prev) => {
+          const next = prev.map((c) => (c.id === id ? { ...c, icon } : c));
+          saveCustomCategories(next);
+          return next;
+        });
       },
       renameCategory: (id, label) => {
         setCustomCategories((prev) => {

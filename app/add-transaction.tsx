@@ -9,8 +9,28 @@ import { INCOME_CATEGORY_ID } from '../lib/categories';
 import { parseAmountInput } from '../lib/format';
 import { TransactionType } from '../lib/types';
 import { useKeyboardAwareScroll } from '../lib/use-keyboard-aware-scroll';
+import { useFocusAfterTour, useScreenTour, type TourStep } from '../lib/tour';
 import { ModalHeader } from '../components/modal-header';
+import { TourTarget } from '../components/tour-target';
 import { Text } from '../components/text';
+
+const TOUR: TourStep[] = [
+  {
+    target: 'entry-type',
+    title: 'Money out, or money in',
+    body: 'Expense records something you spent, and counts against your budgets. Income records money you received. The rest of this form changes to match.',
+  },
+  {
+    target: 'entry-amount',
+    title: 'How much',
+    body: 'Type the figure and the separators are added as you go, so long numbers stay readable.',
+  },
+  {
+    target: 'entry-detail',
+    title: 'What it was for',
+    body: 'On an expense, pick the category it belongs to. On income, name where it came from, which is what the entry is listed under.',
+  },
+];
 
 export default function AddTransaction() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -56,6 +76,12 @@ export default function AddTransaction() {
     router.back();
   };
 
+  useScreenTour('add-transaction', TOUR);
+
+  // Hold the keyboard back until the tour is done; raising it mid-tour reflows
+  // the page the spotlight has already measured.
+  const autoFocusAmount = useFocusAfterTour('add-transaction', amountRef);
+
   return (
     <View className="flex-1 bg-bg">
       <ModalHeader title={editing ? 'Edit Transaction' : 'Add Transaction'} />
@@ -67,6 +93,7 @@ export default function AddTransaction() {
         contentContainerStyle={{ paddingBottom: 64 + keyboardPadding }}
         keyboardShouldPersistTaps="handled"
       >
+        <TourTarget id="entry-type">
         <View className="flex-row rounded-2xl bg-surface border border-border p-1">
           {(['expense', 'income'] as TransactionType[]).map((t) => (
             <Pressable
@@ -80,8 +107,10 @@ export default function AddTransaction() {
             </Pressable>
           ))}
         </View>
+        </TourTarget>
 
-        <View className="mt-6 items-center">
+        <TourTarget id="entry-amount" style={{ marginTop: 24 }}>
+        <View className="items-center">
           <Text className="text-sm text-muted">Amount</Text>
           <TextInput
             ref={amountRef}
@@ -93,12 +122,14 @@ export default function AddTransaction() {
             placeholderTextColorClassName="accent-muted"
             keyboardType="decimal-pad"
             className="mt-1 w-full font-sans-bold text-3xl text-ink text-center"
-            autoFocus
+            autoFocus={autoFocusAmount}
           />
         </View>
+        </TourTarget>
 
+        <TourTarget id="entry-detail" style={{ marginTop: 24 }}>
         {type === 'income' ? (
-          <View className="mt-6">
+          <View>
             <View className="mb-2 flex-row items-baseline justify-between">
               <Text className="text-sm font-medium text-ink">Source</Text>
               <Text className="text-xs text-muted">Optional</Text>
@@ -115,7 +146,7 @@ export default function AddTransaction() {
             />
           </View>
         ) : (
-          <View className="mt-6">
+          <View>
             <View className="mb-2 flex-row items-center justify-between">
               <Text className="text-sm font-medium text-ink">Category</Text>
               <Pressable onPress={() => router.push('/add-category')}>
@@ -144,6 +175,7 @@ export default function AddTransaction() {
             </View>
           </View>
         )}
+        </TourTarget>
 
         <View className="mt-6">
           <Text className="mb-2 text-sm font-medium text-ink">Date</Text>

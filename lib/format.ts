@@ -58,6 +58,47 @@ export function formatAmount(amount: number): string {
   return `${sign}${CURRENCY}${withCommas(abs, 0)}`;
 }
 
+const TIGHT_UNITS = [
+  { limit: 1e12, suffix: 'T' },
+  { limit: 1e9, suffix: 'B' },
+  { limit: 1e6, suffix: 'M' },
+  { limit: 1e3, suffix: 'K' },
+];
+
+/**
+ * Rounding to one decimal carries at 999.95 rather than 999.995, so the
+ * promotion threshold has to be looser here than in formatAmount.
+ */
+const TIGHT_CARRY = 0.99995;
+
+/**
+ * The shortest readable form, for places with very little width: the income
+ * and expense tiles sit two to a row and get narrower still when the reader
+ * has enlarged their system text.
+ *
+ *   under ₦1,000   ₦999.99
+ *   thousands      ₦15.7K, ₦450K
+ *   millions up    ₦1.3M, ₦2.4B
+ *
+ * Shortening beats truncation. "₦450…" tells the reader nothing, while ₦450K
+ * is the right number at a glance, and the exact figure is one tap away.
+ */
+export function formatAmountTight(amount: number): string {
+  const sign = amount < 0 ? '-' : '';
+  const abs = Math.abs(amount);
+
+  if (abs < 1000) return `${sign}${CURRENCY}${withCommas(abs, 2)}`;
+
+  for (const { limit, suffix } of TIGHT_UNITS) {
+    if (abs >= limit * TIGHT_CARRY) {
+      const scaled = (abs / limit).toFixed(1).replace(/\.0$/, '');
+      return `${sign}${CURRENCY}${scaled}${suffix}`;
+    }
+  }
+
+  return `${sign}${CURRENCY}${withCommas(abs, 0)}`;
+}
+
 /**
  * Normalises what someone types into an amount field. `raw` is the parseable
  * value to keep in state; `display` is the same value with grouping separators

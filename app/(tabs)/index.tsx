@@ -1,8 +1,8 @@
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View, type LayoutChangeEvent } from 'react-native';
 import { Link, router } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useData } from '../../lib/store';
-import { formatAmount, isSameMonth, monthLabel } from '../../lib/format';
+import { formatAmount, formatAmountTight, isSameMonth, monthLabel } from '../../lib/format';
 import { getCategory } from '../../lib/categories';
 import { useThemeColors } from '../../lib/theme';
 import { ProgressBar } from '../../components/progress-bar';
@@ -58,7 +58,7 @@ const TOUR: TourStep[] = [
 
 export default function Dashboard() {
   const { transactions: saved, budgets, customCategories, expenseCategories } = useData();
-  const { isActive: tourRunning, resetTours } = useTour();
+  const { isActive: tourRunning, activeTarget, resetTours } = useTour();
   const colors = useThemeColors();
   const now = useMemo(() => new Date(), []);
 
@@ -102,9 +102,27 @@ export default function Dashboard() {
 
   useScreenTour('overview', TOUR);
 
+  // Sections lower down the page can sit half off screen, especially at larger
+  // text sizes, and a spotlight around a half-visible section stretches to the
+  // bottom of the window and swallows the tab bar with it. Bringing the section
+  // into view first means the ring is drawn around the section alone.
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionTops = useRef<Record<string, number>>({});
+  const trackTop = (key: string) => (e: LayoutChangeEvent) => {
+    sectionTops.current[key] = e.nativeEvent.layout.y;
+  };
+
+  useEffect(() => {
+    if (!activeTarget) return;
+    const y = sectionTops.current[activeTarget];
+    if (y === undefined) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 24), animated: true });
+  }, [activeTarget]);
+
   return (
     <View className="flex-1 bg-bg">
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="px-safe-or-5 pt-safe-or-4 pb-32"
         contentInsetAdjustmentBehavior="automatic"
@@ -160,7 +178,7 @@ export default function Dashboard() {
                   <Ionicons name="chevron-forward" size={11} color={colors.muted} />
                 </View>
                 <Text numberOfLines={1} className="text-base font-semibold text-ink">
-                  {formatAmount(income)}
+                  {formatAmountTight(income)}
                 </Text>
               </View>
             </Pressable>
@@ -179,7 +197,7 @@ export default function Dashboard() {
                   <Ionicons name="chevron-forward" size={11} color={colors.muted} />
                 </View>
                 <Text numberOfLines={1} className="text-base font-semibold text-ink">
-                  {formatAmount(expense)}
+                  {formatAmountTight(expense)}
                 </Text>
               </View>
             </Pressable>
@@ -192,6 +210,7 @@ export default function Dashboard() {
         </View>
         </TourTarget>
 
+        <View onLayout={trackTop('overview-budgets')}>
         <TourTarget id="overview-budgets" style={{ marginTop: 32 }}>
           <View className="flex-row items-center justify-between">
             <Text className="text-lg font-semibold text-ink">Budgets</Text>
@@ -234,7 +253,9 @@ export default function Dashboard() {
             </View>
           )}
         </TourTarget>
+        </View>
 
+        <View onLayout={trackTop('overview-recent')}>
         <TourTarget id="overview-recent" style={{ marginTop: 32 }}>
         <View>
           <View className="flex-row items-center justify-between">
@@ -259,6 +280,7 @@ export default function Dashboard() {
           )}
         </View>
         </TourTarget>
+        </View>
       </ScrollView>
     </View>
   );

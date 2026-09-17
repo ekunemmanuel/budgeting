@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useData } from '../lib/store';
 import {
+  CATEGORY_ICONS,
   OTHER_CATEGORY_ID,
   canRemoveCategory,
   getCategory,
@@ -11,8 +12,25 @@ import {
 } from '../lib/categories';
 import { parseAmountInput } from '../lib/format';
 import { useKeyboardAwareScroll } from '../lib/use-keyboard-aware-scroll';
+import { useFocusAfterTour, useScreenTour, type TourStep } from '../lib/tour';
 import { ModalHeader } from '../components/modal-header';
+import { TourTarget } from '../components/tour-target';
 import { Text } from '../components/text';
+
+// Only shown for a renameable category. Setting a plain limit needs no
+// explanation; that you can turn Other into a category of your own does.
+const TOUR: TourStep[] = [
+  {
+    target: 'budget-title',
+    title: 'Give it your own name',
+    body: 'Type over this to file the budget under a category of your own. Other stays where it is for everything else.',
+  },
+  {
+    target: 'budget-icon',
+    title: 'Pick an icon',
+    body: 'Choose the icon this category shows in your lists and pickers.',
+  },
+];
 
 export default function EditBudget() {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
@@ -24,6 +42,7 @@ export default function EditBudget() {
     expenseCategories,
     addCategory,
     renameCategory,
+    setCategoryIcon,
   } = useData();
 
   const category = getCategory(categoryId ?? '', customCategories);
@@ -36,7 +55,9 @@ export default function EditBudget() {
   const titleEditable = clonesOnRename || !builtIn;
 
   const [title, setTitle] = useState(category.label);
+  const [icon, setIcon] = useState(category.icon);
   const [amount, setAmount] = useState(existing ? String(existing) : '');
+  const iconChanged = titleEditable && icon !== category.icon;
   const amountRef = useRef<TextInput>(null);
   const titleRef = useRef<TextInput>(null);
   const { scrollRef, keyboardPadding, onFocusInput, onBlurInput, onScroll } = useKeyboardAwareScroll();
@@ -46,7 +67,7 @@ export default function EditBudget() {
 
   const trimmedTitle = title.trim();
   const titleChanged = titleEditable && trimmedTitle.length > 0 && trimmedTitle !== category.label;
-  const canSave = amountValid || titleChanged;
+  const canSave = amountValid || titleChanged || iconChanged;
 
   const save = () => {
     if (!canSave) return;
@@ -56,10 +77,12 @@ export default function EditBudget() {
       const match = expenseCategories.find(
         (c) => c.label.toLowerCase() === trimmedTitle.toLowerCase() && c.id !== category.id
       );
-      const target = match ?? addCategory(trimmedTitle);
+      const target = match ?? addCategory(trimmedTitle, icon);
+      if (match && iconChanged) setCategoryIcon(match.id, icon);
       if (amountValid) setBudget(target.id, parsedAmount);
     } else {
       if (titleChanged) renameCategory(category.id, trimmedTitle);
+      if (iconChanged) setCategoryIcon(category.id, icon);
       if (amountValid) setBudget(category.id, parsedAmount);
     }
 
@@ -70,6 +93,15 @@ export default function EditBudget() {
     removeBudget(category.id);
     router.back();
   };
+
+  // Keyed per category kind, so the rename explanation runs once for Other and
+  // once for a category of your own, rather than on every budget you set.
+  const tourId = titleEditable ? `budget-${clonesOnRename ? 'other' : 'custom'}` : 'budget-none';
+  useScreenTour(tourId, TOUR);
+
+  // The amount field would otherwise raise the keyboard on open, reflowing the
+  // page out from under the spotlight. Focus waits for the tour, then lands.
+  const autoFocusAmount = useFocusAfterTour(tourId, amountRef, titleEditable);
 
   const confirmRemoveCategory = () =>
     router.push({ pathname: '/confirm-delete', params: { kind: 'category', id: category.id } });
@@ -94,16 +126,18 @@ export default function EditBudget() {
           </View>
 
           {titleEditable ? (
-            <TextInput
-              ref={titleRef}
-              value={title}
-              onChangeText={setTitle}
-              onFocus={() => onFocusInput(titleRef)}
-              onBlur={() => onBlurInput(titleRef)}
-              placeholder="Category name"
-              placeholderTextColorClassName="accent-muted"
-              className="mt-3 w-full font-sans-semibold text-lg text-ink text-center"
-            />
+            <TourTarget id="budget-title" style={{ alignSelf: 'stretch' }}>
+              <TextInput
+                ref={titleRef}
+                value={title}
+                onChangeText={setTitle}
+                onFocus={() => onFocusInput(titleRef)}
+                onBlur={() => onBlurInput(titleRef)}
+                placeholder="Category name"
+                placeholderTextColorClassName="accent-muted"
+                className="mt-3 w-full font-sans-semibold text-lg text-ink text-center"
+              />
+            </TourTarget>
           ) : (
             <Text className="mt-3 text-lg font-semibold text-ink">{category.label}</Text>
           )}
@@ -117,6 +151,36 @@ export default function EditBudget() {
           </Text>
         )}
 
+        {titleEditable && (
+          <TourTarget id="budget-icon" style={{ marginTop: 20 }}>
+            <Text className="mb-2 text-sm font-medium text-ink">Icon</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {CATEGORY_ICONS.map((name) => {
+                const selected = icon === name;
+                return (
+                  <Pressable
+                    key={name}
+                    onPress={() => setIcon(name)}
+                    accessibilityRole="button"
+                    accessibilityState={selected ? { selected: true } : {}}
+                    className="h-11 w-11 items-center justify-center rounded-full border active:opacity-70"
+                    style={{
+                      backgroundColor: selected ? category.color : `${category.color}18`,
+                      borderColor: selected ? category.color : 'transparent',
+                    }}
+                  >
+                    <Ionicons
+                      name={name as any}
+                      size={18}
+                      color={selected ? 'white' : category.color}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+          </TourTarget>
+        )}
+
         <TextInput
           ref={amountRef}
           value={amount ? `₦${parseAmountInput(amount).display}` : ''}
@@ -126,7 +190,7 @@ export default function EditBudget() {
           placeholder="₦0.00"
           placeholderTextColorClassName="accent-muted"
           keyboardType="decimal-pad"
-          autoFocus
+          autoFocus={autoFocusAmount}
           className="mt-6 w-full font-sans-bold text-3xl text-ink text-center"
         />
 
